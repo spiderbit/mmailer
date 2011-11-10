@@ -1,0 +1,52 @@
+# mmailer
+
+mmailer is Mass-mailer tool, it allows you to send generated mails from a mail-template and substitudes from a csv file.
+
+SparkleShare currently works on Linux and python 2.7
+
+
+# License
+
+mmailer is free software and licensed under the GNU GPLv3 or later. You
+are welcome to change and redistribute it under certain conditions. For more
+information see the LICENSE file or visit http://www.gnu.org/licenses/gpl-3.0.html
+
+
+# Requirements
+
+   - python > 2.7
+   - mail-server
+
+Just start it and follow the instructions:
+
+   $ sh mmailer.py
+
+1. you are told to tell mmailer all it needs to connect to your smtp server
+* I only testet this with googlemail server
+* be aware that mmailer saves your password in cleartext right now in the config.txt file.
+
+
+In the template file "mail.txt" replace text which is not in all mails the same by a substitude with $ as first sign like this:
+
+   Dear $receiver,
+
+Then run the programm again
+
+   $ sh mmailer.py
+
+mmailer now creates a keys.csv file for you, open it as example with libreoffice
+* select utf-8
+
+For each mail you want to send, fill out one line of substitudes.
+
+Save it!
+
+Run mmailer again:
+
+   $ sh mmailer.py
+
+Now it shows you the mails it generated and asks if you want it should send them!
+
+If you like what you see press enter for each mail and mmailer sends them.
+
+Have fun!
