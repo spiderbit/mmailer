@@ -2,7 +2,7 @@
 
 mmailer is Mass-mailer tool, it allows you to send generated mails from a mail-template and substitudes from a csv file.
 
-SparkleShare currently works on Linux and python 2.7
+mmailer currently works on Linux and python 2.7
 
 
 # License
