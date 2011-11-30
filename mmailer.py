@@ -46,9 +46,16 @@ def ask(question, typ, default=None):
 			print "Please type in one of the choices."
 	return value
 
+from email.MIMEBase import MIMEBase
+from email import Encoders
+from email.MIMEMultipart import MIMEMultipart
+from email.MIMEBase import MIMEBase
+from email.MIMEText import MIMEText
+
+
 class Mail (object):
 
-	def __init__(self, config):
+	def __init__(self, config, files=[]):
 		self.smtp_server = config.get('Mail', 'server')
 		self.port = config.get('Mail', 'port')
 		self.esmtp = config.get('Mail', 'esmtp')
@@ -56,6 +63,7 @@ class Mail (object):
 		self.user = config.get('Mail', 'user')
 		self.password = config.get('Mail', 'password')
 		self.mail_from = config.get('Mail', 'email')
+		self.files = files
 
 	def connect_smtp(self):
 		try:
@@ -71,11 +79,16 @@ class Mail (object):
 			self.connected = False
 			
 	def send(self, to, msg):
+		for f in self.files:
+			part = MIMEBase('application', "octet-stream")
+			part.set_payload( open(f,"rb").read() )
+			Encoders.encode_base64(part)
+			part.add_header('Content-Disposition', 'attachment; filename="%s"' % os.path.basename(f))
+			msg.attach(part)
 		self.server.sendmail(self.mail_from, to, msg.as_string())
 
 	def quit(self):
 		self.server.quit()
-
 
 if __name__ == '__main__':
 	config = SafeConfigParser()
@@ -84,11 +97,11 @@ if __name__ == '__main__':
 	if not config.has_section('Mail'):
 		print 'SMTP Server Settings\n\n'
 		config.add_section('Mail')
-		value = ask('Server', 'string')		
+		value = ask('Server', 'string')
 		config.set('Mail', 'server', value)
-		value = ask('Port', 'int', '587')		
+		value = ask('Port', 'int', '587')
 		config.set('Mail', 'port', value)
-		value = ask('esmtp', 'bool', 'yes')		
+		value = ask('esmtp', 'bool', 'yes')
 		config.set('Mail', 'esmtp', value)
 		value = ask('tls', 'bool', 'yes')
 		config.set('Mail', 'tls', value)
@@ -129,6 +142,21 @@ if __name__ == '__main__':
 			print "wrote %s file for template data please add some lines!" % (csv_fn)
 			print "then restart this programm!"
 			sys.exit(0)
+	afile = 'attachments.txt'
+	if not os.path.exists(afile):
+		print 'no %s file found!', (afile)
+		print 'If you want attachements create it and place one file location per line in it!'
+		value = ask('Should I exit mmailer and create that file empty for you?', 'bool', 'yes')
+		if value == 'true':
+			open(afile, 'w+')
+			sys.exit(0)
+	else:
+		with open('attachments.txt', 'rb') as afile:
+			attachments=[]
+			for row in afile:
+				attachments.append(row[:-1])
+			mail.files=attachments
+
 	with open(csv_fn, 'rb') as csv_file, open(textfile, 'rb') as fp:
 		reader = csv.DictReader(csv_file, keys)
 		output = Template(plaintext)
@@ -146,12 +174,13 @@ if __name__ == '__main__':
 				msg['Subject'] = row['subject']
 				msg['From'] = config.get('Mail', 'email')
 				msg['To'] = mail_to
+				msg2 = MIMEMultipart()
+				msg2.attach(msg)
 				if not mail.connected:
 					mail.connect_smtp()
-				mail.send(mail_to, msg)
+				mail.send(mail_to, msg2)
 				count+=1
 
 		print "did send %s mail[s]!" % (count)
 		mail.quit()
-
 
