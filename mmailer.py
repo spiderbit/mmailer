@@ -77,7 +77,7 @@ class Mail (object):
 			self.connected = True
 		except:
 			self.connected = False
-			
+
 	def send(self, to, msg):
 		for f in self.files:
 			part = MIMEBase('application', "octet-stream")
@@ -89,6 +89,7 @@ class Mail (object):
 
 	def quit(self):
 		self.server.quit()
+
 
 if __name__ == '__main__':
 	config = SafeConfigParser()
@@ -122,16 +123,22 @@ if __name__ == '__main__':
 		print "could not connect with your settings restart with new values!"
 		sys.exit(0)
 
-	textfile = "mail.txt"
-	if not textfile in os.listdir('.'):
-		print "need a file %s in this directory as email-template!" %(textfile)
-		sys.exit()
-
-	fp = open(textfile, 'rb')
-	plaintext = fp.read()
-	keys = re.findall('\$([a-zA-Z]+)', plaintext)
-	keys.append('subject')
+	template_files = dict()
+	template_files['mail'] = "mail.txt"
+	template_files['subject'] = "subject.txt"
+	keys = []
+	for k,v in template_files.iteritems():
+		if not v in os.listdir('.'):
+			print "need a file %s in this directory as %s-template!" %(v,k)
+			sys.exit()
+		else:
+			fp = open(v, 'rb')
+			plaintext = fp.read()
+			tmp_keys = re.findall('\$([a-zA-Z]+)', plaintext)
+			keys.extend(tmp_keys)
+			print keys
 	keys.append('email')
+
 	import os.path
 	import csv
 	csv_fn = 'keys.csv'
@@ -157,24 +164,27 @@ if __name__ == '__main__':
 				attachments.append(row[:-1])
 			mail.files=attachments
 
-	with open(csv_fn, 'rb') as csv_file, open(textfile, 'rb') as fp:
+	with open(csv_fn, 'rb') as csv_file, open(template_files['mail'], 'rb') as mail_template,\
+			open(template_files['subject'], 'rb') as subject_template:
 		reader = csv.DictReader(csv_file, keys)
-		output = Template(plaintext)
+		output = Template(mail_template.read())
 		reader.next()
+		output_subject = Template(subject_template.readline()[:-1])
 		count = 0
 		for row in reader:
 			msg_only = output.substitute(row)
+			subject = output_subject.substitute(row)
 			msg = MIMEText(msg_only)
 			print msg
 			mail_to = row['email']
 			print "send to: %s" % mail_to
-			print "subject: <%s>" % row['subject']
+			print "subject: <%s>" % subject
 			approved = ask('Look over the mail is it all right? should I send it for you?', 'bool', 'yes')
 			if approved == 'true':
-				msg['Subject'] = row['subject']
-				msg['From'] = config.get('Mail', 'email')
-				msg['To'] = mail_to
 				msg2 = MIMEMultipart()
+				msg2['Subject'] = subject
+				msg2['From'] = config.get('Mail', 'email')
+				msg2['To'] = mail_to
 				msg2.attach(msg)
 				if not mail.connected:
 					mail.connect_smtp()
@@ -183,4 +193,5 @@ if __name__ == '__main__':
 
 		print "did send %s mail[s]!" % (count)
 		mail.quit()
+
 
