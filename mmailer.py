@@ -91,10 +91,11 @@ class Mail (object):
 		self.server.quit()
 
 
-if __name__ == '__main__':
+def main():
 	config = SafeConfigParser()
 	config.read('config.txt')
 	mail = None
+	global os
 	if not config.has_section('Mail'):
 		print 'SMTP Server Settings\n\n'
 		config.add_section('Mail')
@@ -193,5 +194,9 @@ if __name__ == '__main__':
 
 		print "did send %s mail[s]!" % (count)
 		mail.quit()
+
+
+if __name__ == '__main__':
+	sys.exit(main())
 
 
