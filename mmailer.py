@@ -58,8 +58,8 @@ class Mail (object):
 	def __init__(self, config, files=[]):
 		self.smtp_server = config.get('Mail', 'server')
 		self.port = config.get('Mail', 'port')
-		self.esmtp = config.get('Mail', 'esmtp')
-		self.tls = config.get('Mail', 'tls')
+		self.esmtp = config.getboolean('Mail', 'esmtp')
+		self.tls = config.getboolean('Mail', 'tls')
 		self.user = config.get('Mail', 'user')
 		self.password = config.get('Mail', 'password')
 		self.mail_from = config.get('Mail', 'email')
