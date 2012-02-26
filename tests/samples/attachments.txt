@@ -1,0 +1,2 @@
+tests/samples/attach_ascii.txt
+tests/samples/attach_bin.gz

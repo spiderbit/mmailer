@@ -2,7 +2,7 @@
 
 mmailer is Mass-mailer tool, it allows you to send generated mails from a mail-template and substitudes from a csv file.
 
-mmailer currently works on Linux and python 2.7
+mmailer currently is tested and runs shure under Linux and python 2.7
 
 
 # License
@@ -17,36 +17,19 @@ information see the LICENSE file or visit http://www.gnu.org/licenses/gpl-3.0.ht
    - python > 2.7
    - mail-server
 
-Just start it and follow the instructions:
+Start mmailer with --help to find out how to use it!
 
-   $ sh mmailer.py
+   $ sh mmailer.py --help
 
-1. you are told to tell mmailer all it needs to connect to your smtp server
-* I only testet this with googlemail server
-* be aware that mmailer saves your password in cleartext right now in the config.txt file.
+* be aware that mmailer saves your password in cleartext right now in the config file.
 
+look under samples for the format a mail.txt file should have:
 
-In the template file "mail.txt" replace text which is not in all mails the same by a substitude with $ as first sign like this:
+ > ./tests/samples/mail.txt
 
-   Dear $receiver,
+For each mail you want to send, fill out one line of substitude in the csv file.
 
-Then run the programm again
-
-   $ sh mmailer.py
-
-mmailer now creates a keys.csv file for you, open it as example with libreoffice
-* select utf-8
-
-For each mail you want to send, fill out one line of substitudes.
-
-Save it!
-
-Run mmailer again:
-
-   $ sh mmailer.py
-
-Now it shows you the mails it generated and asks if you want it should send them!
-
-If you like what you see press enter for each mail and mmailer sends them.
 
 Have fun!
+
+

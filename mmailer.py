@@ -15,7 +15,14 @@ from smtplib import SMTP
 from email.MIMEText import MIMEText
 from email.Header import Header
 from email.Utils import parseaddr, formataddr
-
+import subprocess
+import os.path
+import csv
+import getpass
+import socket
+from os import environ as env
+import argparse
+import shutil
 
 def ask(question, typ, default=None):
 	value = None
@@ -26,9 +33,9 @@ def ask(question, typ, default=None):
 			user_input = raw_input('%s %s :' % (question, choice))
 			user_input = user_input.lower()
 			if user_input == 'yes' or user_input == '':
-				value = 'true'
+				value = True
 			elif user_input == 'no':
-				value = 'false'
+				value = False
 		elif typ == 'string':
 			if default == None:
 				user_input = raw_input('%s :' % (question))
@@ -56,7 +63,13 @@ def ask(question, typ, default=None):
 
 class Mail (object):
 
-	def __init__(self, config, files=[]):
+	def __init__(self, files=[]):
+		self.cm = ConfigManager()
+		self.load_smtp()
+		self.files = files
+
+	def load_smtp(self):
+		config = self.cm.config
 		self.smtp_server = config.get('Mail', 'server')
 		self.port = config.get('Mail', 'port')
 		self.esmtp = config.getboolean('Mail', 'esmtp')
@@ -64,7 +77,7 @@ class Mail (object):
 		self.user = config.get('Mail', 'user')
 		self.password = config.get('Mail', 'password')
 		self.mail_from = config.get('Mail', 'email')
-		self.files = files
+		self.connected = False
 
 	def connect_smtp(self):
 		try:
@@ -80,7 +93,8 @@ class Mail (object):
 			self.connected = False
 
 	def quit(self):
-		self.server.quit()
+		if self.connected:
+			self.server.quit()
 
 
 
@@ -142,107 +156,389 @@ class Mail (object):
 		# Send the message via SMTP
 		self.server.sendmail(sender, recipient, msg.as_string())
 
-
-def main():
-	config = SafeConfigParser()
-	config.read('config.txt')
-	mail = None
-	global os
-	if not config.has_section('Mail'):
+	def ask_for_smtp(self):
+		# should be a mmailer config method
+		home = env['HOME']
+		config = self.cm.config
+		mail = None
 		print 'SMTP Server Settings\n\n'
-		config.add_section('Mail')
-		value = ask('Server', 'string')
-		config.set('Mail', 'server', value)
-		value = ask('Port', 'int', '587')
-		config.set('Mail', 'port', value)
-		value = ask('esmtp', 'bool', 'yes')
-		config.set('Mail', 'esmtp', value)
-		value = ask('tls', 'bool', 'yes')
-		config.set('Mail', 'tls', value)
-		value = ask('Whats your login', 'string')
-		config.set('Mail', 'user', value)
-		value = ask('Whats your password', 'string')
-		config.set('Mail', 'password', value)
-		value = ask('Whats your email address', 'string', config.get('Mail', 'user'))
-		config.set('Mail', 'email', value)
-	mail = Mail(config)
-	print "try to connect!"
-	mail.connect_smtp()
-	if mail.connected:
-		with open('config.txt', 'wb') as configfile:
-			print "success write settings into config!"
-			config.write(configfile)
-	else:
-		print "could not connect with your settings restart with new values!"
-		sys.exit(0)
-	template_files = dict()
-	template_files['mail'] = "mail.txt"
-	template_files['subject'] = "subject.txt"
-	keys = []
-	for k,v in template_files.iteritems():
-		if not v in os.listdir('.'):
-			print "need a file %s in this directory as %s-template!" %(v,k)
-			sys.exit()
+		value = str(ask('Server', 'string'))
+		self.cm.config.set('Mail', 'server', value)
+		value = str(ask('Port', 'int', '587'))
+		self.cm.config.set('Mail', 'port', value)
+		value = str(ask('esmtp', 'bool', 'yes'))
+		self.cm.config.set('Mail', 'esmtp', value)
+		value = str(ask('tls', 'bool', 'yes'))
+		self.cm.config.set('Mail', 'tls', value)
+		value = str(ask('Whats your login', 'string'))
+		self.cm.config.set('Mail', 'user', value)
+		value = str(ask('Whats your password', 'string'))
+		self.cm.config.set('Mail', 'password', value)
+		value = str(ask('Whats your email address',
+			'string', config.get('Mail', 'user')))
+		self.cm.config.set('Mail', 'email', value)
+		print "try to connect!"
+		self.load_smtp()
+		self.connect_smtp()
+		if self.connected:
+			self.cm.write()
 		else:
+			print ("could not connect - restart and try again!")
+
+
+class ConfigManager (object):
+
+	def __init__(self):
+		uname = getpass.getuser()
+		host = socket.gethostname()
+		home = env['HOME']
+		self.config_dir = os.path.join(home, '.config', 'mmailer')
+		self.config_path = os.path.join(self.config_dir, 'config')
+		config = self.config = SafeConfigParser()
+		if os.path.isfile(self.config_path):
+			self.read()
+		else:
+			config.add_section('Mail')
+			config.set('Mail', 'server', host)
+			config.set('Mail', 'port', '1025')
+			config.set('Mail', 'esmtp', 'no')
+			config.set('Mail', 'tls', 'no')
+			config.set('Mail', 'user', uname)
+			config.set('Mail', 'password', '')
+			config.set('Mail', 'email', uname + "@" + host)
+			self.write()
+
+	def write(self):
+		if not os.path.exists(self.config_dir):
+			os.makedirs(self.config_dir)
+		with open(self.config_path, 'wb') as config_file:
+			self.config.write(config_file)
+
+	def read(self):
+		self.config.read(self.config_path)
+
+	def set_active_project(self, name):
+		if not self.config.has_section('Project'):
+			self.config.add_section('Project')
+		self.config.set('Project', 'selected', name)
+		self.write()
+
+	def remove_section_project(self):
+		if self.config.has_section('Project'):
+			self.config.remove_section('Project')
+		self.write()
+
+	def get_active_project(self):
+		if self.config.has_section('Project'):
+			return self.config.get('Project', 'selected')
+		return None
+
+
+
+class Project (object):
+
+	def __init__(self, name):
+		self.name = name
+		home = env['HOME']
+		config_dir = os.path.join(home, '.config', 'mmailer')
+		self.projects_dir = os.path.join(config_dir, 'projects')
+		self.proj_dir = os.path.join(self.projects_dir, name)
+		self.attachments=[]
+		self.template_files=dict()
+		self.template_files['mail'] = \
+			os.path.join(self.proj_dir, 'mail.txt')
+		self.template_files['subject'] = \
+			os.path.join(self.proj_dir, 'subject.txt')
+		self.keys = []
+		self.cm = ConfigManager()
+
+	def create(self):
+		if not os.path.exists(self.proj_dir):
+			os.makedirs(self.proj_dir)
+
+	def create_files(self):
+		sys.exit("code commented out for reinspection")
+		# overrides the files at the moment
+		# maybe not neaded for edit command anyway
+		for f in self.files():
+			p = open(f, 'w')
+			p.write('')
+			p.close()
+
+	def files(self):
+		files = ['mail.txt', 'subject.txt', 'attachments.txt']
+		abs_files = []
+		for f in files:
+			abs_files.append(os.path.join(self.proj_dir, f))
+		return abs_files
+
+	def substitude_file(self):
+		sfile = os.path.join(self.proj_dir, 'keys.csv')
+		return sfile
+
+	def remove(self):
+		shutil.rmtree(self.proj_dir)
+
+	def load_keys(self):
+		template_files = self.template_files
+		for k,v in template_files.iteritems():
+			#if not v in os.listdir('.'):
+			#	print "need a file %s in this directory as %s-template!" %(v,k)
+			#	sys.exit()
+			#else:
 			fp = open(v, 'rb')
 			plaintext = fp.read()
-			tmp_keys = re.findall('\$([a-zA-Z]+)', plaintext)
-			keys.extend(tmp_keys)
-	keys.append('email')
-	import os.path
-	import csv
-	csv_fn = 'keys.csv'
-	if not os.path.exists(csv_fn):
-		with open(csv_fn, 'wb') as csv_file:
-			writer = csv.DictWriter(csv_file, keys)
-			writer.writeheader()
-			print "wrote %s file for template data please add some lines!" % (csv_fn)
-			print "then restart this programm!"
-			sys.exit(0)
-	afile = 'attachments.txt'
-	if not os.path.exists(afile):
-		print 'no %s file found!', (afile)
-		print 'If you want attachements create it and place one file location per line in it!'
-		value = ask('Should I exit mmailer and create that file empty for you?', 'bool', 'yes')
-		if value == 'true':
-			open(afile, 'w+')
-			sys.exit(0)
-	else:
-		with open('attachments.txt', 'rb') as afile:
-			attachments=[]
+			tmp_keys = re.findall('\$([a-zA-Z_]+)', plaintext)
+			self.keys.extend(tmp_keys)
+		self.keys = list(set(self.keys)) # to remove double entries
+		self.keys.append('email')
+
+	def create_table(self):
+		abs_files = self.files()
+		self.load_keys()
+		keys = self.keys
+		csv_fn = os.path.join(self.proj_dir, 'keys.csv')
+		if not os.path.exists(csv_fn):
+			with open(csv_fn, 'wb') as csv_file:
+				writer = csv.DictWriter(csv_file, keys)
+				writer.writeheader()
+		#afile = os.path.join(self.proj_dir, 'attachments.txt')
+
+		#if not os.path.exists(afile):
+		#	print 'no %s file found!', (afile)
+		#	print ("If you want attachements create it "
+		#		"and place one file location per line in it!")
+		#	value = ask('Should I exit mmailer and create'
+		#		' that file empty for you?', 'bool', 'yes')
+		#	if value == 'true':
+		#		open(afile, 'w+')
+		#		sys.exit(0)
+		#else:
+
+	def load_attachments(self):
+		afile = os.path.join(self.proj_dir,'attachments.txt')
+		with open(afile, 'rb') as afile:
 			for row in afile:
-				attachments.append(row[:-1])
-			mail.files=attachments
+				if os.path.isfile(row[:-1]):
+					self.attachments.append(row[:-1])
+				else:
+					sys.exit("one of your attachments \
+					dont exist or is no file: <%s>" % (row[:-1]))
+		return
 
-	with open(csv_fn, 'rb') as csv_file, open(template_files['mail'], 'rb') as mail_template,\
-			open(template_files['subject'], 'rb') as subject_template:
-		reader = csv.DictReader(csv_file, keys)
-		output = Template(mail_template.read())
-		reader.next()
-		output_subject = Template(subject_template.readline()[:-1])
-		count = 0
-		for row in reader:
-			msg_only = output.substitute(row)
-			subject = unicode(output_subject.substitute(row), encoding='UTF-8')
-			print msg_only
-			mail_to = row['email']
-			print "send to: %s" % mail_to
-			print "subject: <%s>" % subject
-			approved = ask('Look over the mail is it all right? should I send it for you?', 'bool', 'yes')
-			if approved == 'true':
-				if not mail.connected:
-					mail.connect_smtp()
-				body = unicode(msg_only, encoding='UTF-8')
-				recipient = unicode(mail_to, encoding='UTF-8')
-				sender = unicode(config.get('Mail', 'email'), encoding='UTF-8')
-				mail.send(sender, recipient, subject, body)
-				count+=1
 
-		print "did send %s mail[s]!" % (count)
-		mail.quit()
+	def send(self):
+		mail = Mail()
+		mail.connect_smtp()
+		self.load_keys()
+		keys = self.keys
+		config = self.cm.config
+		self.load_attachments()
+		with open(self.substitude_file(), 'rb') as csv_file, \
+		open(self.template_files['mail'], 'rb') as mail_template,\
+		open(self.template_files['subject'], 'rb') as subject_template:
+			reader = csv.DictReader(csv_file, keys)
+			output = Template(mail_template.read())
+			reader.next()
+			output_subject = Template(subject_template.readline()[:-1])
+			count = 0
+			for row in reader:
+				msg_only = output.substitute(row)
+				subject = unicode(output_subject.substitute(row), \
+					encoding='UTF-8')
+				mail_to = row['email']
+				print msg_only
+				print "send to: %s" % mail_to
+				print "subject: <%s>" % subject
+				approved = ask('Look over the mail is it all right?'\
+					' should I send it for you?', 'bool', 'yes')
+				if approved:
+					if not mail.connected:
+						mail.connect_smtp()
+					body = unicode(msg_only, encoding='UTF-8')
+					recipient = unicode(mail_to, encoding='UTF-8')
+					sender = unicode(config.get('Mail', 'email'), \
+						encoding='UTF-8')
+					mail.send(sender, recipient, subject, body)
+					count+=1
+			print "did send %s mail[s]!" % (count)
+			mail.quit()
+
+class ProjectList (object):
+
+	def __init__(self):
+		self.projects = dict()
+		self.cm = ConfigManager()
+		home = env['HOME']
+		config_dir = os.path.join(home, '.config', 'mmailer')
+		self.projects_dir = os.path.join(config_dir, 'projects')
+		if not os.path.exists(self.projects_dir):
+			os.makedirs(self.projects_dir)
+		self.search()
+
+	def projects_sorted(self):
+		keylist = self.projects.keys()
+		keylist.sort()
+		return keylist
+
+	def search(self):
+		files = os.listdir(self.projects_dir)
+		for f in files:
+			if os.path.isdir(os.path.join(self.projects_dir, f)):
+				self.projects[f] = Project(f)
+
+	def add_project(self, name):
+		if len(self.projects) == 0:
+			self.cm.set_active_project(name)
+		p = Project(name)
+		p.create()
+		self.projects[name] = p
+
+	def remove(self, name):
+		self.projects[name].remove()
+		del self.projects[name]
+		if len (self.projects) > 0:
+			new_default = self.projects_sorted()[0]
+			self.cm.set_active_project(new_default)
+		else:
+			self.cm.remove_section_project()
+
+	def get_active_project(self):
+		return self.cm.get_active_project()
+
+
+	def set_active_project(self, name):
+		return self.cm.set_active_project(name)
+
+
+class MMailer (object):
+
+	def __init__(self):
+		self.cm = ConfigManager()
+
+	def command_new(self, args):
+		name = args.proj_name
+		pl = ProjectList()
+		if not name in pl.projects.keys():
+			pl.add_project(name)
+		return
+
+	def command_list(self, args):
+		pl = ProjectList()
+		if len(pl.projects) == 0:
+			print "No project availible, create it with the new command!"
+		else:
+			p_names = pl.projects_sorted()
+			pa_lines=''
+			for pa in p_names:
+				selected_prj = pl.cm.config.get('Project', 'selected')
+				if pa == selected_prj:
+					pa_lines += "%s *\n" % (pa)
+				else:
+					pa_lines += "%s\n" % (pa)
+			prj_str = 'Projects:\n---------\n%s' % (pa_lines)
+			print prj_str
+
+	def command_edit(self, args):
+		pl = ProjectList()
+		active_project = pl.get_active_project()
+		if active_project != None:
+			p = pl.projects[active_project]
+			#p.create_files()
+			retvalue = subprocess.call( \
+				[env['EDITOR']] + p.files())
+			if retvalue == 0:
+				pass
+		return
+
+	def command_edit_table(self, args):
+		pl = ProjectList()
+		active_project = pl.get_active_project()
+		if active_project != None:
+			p = pl.projects[active_project]
+			p.create_table()
+			retvalue = subprocess.call(
+				[env['EDITOR'], p.substitude_file()])
+			if retvalue == 0:
+				pass
+		return
+
+	def command_remove(self, args):
+		pl = ProjectList()
+		active_project = pl.get_active_project()
+		if active_project != None:
+			confirmed = ask('Are you shure?', 'bool', 'no')
+			if confirmed:
+				pl.remove(active_project)
+		return
+
+	def command_select(self, args):
+		name = args.proj_name
+		pl = ProjectList()
+		if name in pl.projects.keys():
+			pl.set_active_project(name)
+		return
+
+	def command_send(self, args):
+		pl = ProjectList()
+		active_project = pl.get_active_project()
+		if active_project != None:
+			p = pl.projects[active_project]
+			p.send()
+
+
+	def command_config(self, args):
+		mail = Mail()
+		mail.ask_for_smtp()
+
+
+
+def args_config():
+	m = MMailer()
+	parser = argparse.ArgumentParser(
+		description='Serial mail managing tool.')
+	subparsers = parser.add_subparsers()
+	new_parser = subparsers.add_parser('new')
+	new_parser.add_argument('proj_name')
+	new_parser.set_defaults(func=m.command_new)
+	list_parser = subparsers.add_parser('list')
+	list_parser.set_defaults(func=m.command_list)
+	select_parser = subparsers.add_parser('select')
+	select_parser.add_argument('proj_name')
+	select_parser.set_defaults(func=m.command_select)
+	edit_parser = subparsers.add_parser('edit')
+	edit_parser.set_defaults(func=m.command_edit)
+	edit_table_parser = subparsers.add_parser('edit-table')
+	edit_table_parser.set_defaults(func=m.command_edit_table)
+	remove_parser = subparsers.add_parser('remove')
+	remove_parser.set_defaults(func=m.command_remove)
+	config_parser = subparsers.add_parser('config')
+	config_parser.set_defaults(func=m.command_config)
+	send_parser = subparsers.add_parser('send')
+	send_parser.set_defaults(func=m.command_send)
+	new_parser.description = "creates a new project"
+	list_parser.description = "lists all projects"
+	select_parser.description = "selects a project"
+	edit_parser.description = "edits the project files"
+	edit_table_parser.description = "generates a table where each line \
+		you fill will create a mail"
+	remove_parser.description = "removes the active project"
+	config_parser.description = "asks you for you smtp-server settings"
+	send_parser.description = "sends the emails generated from your \
+		current project"
+	args = parser.parse_args(sys.argv[1:])
+	if 'func' in args:
+		args.func(args)
+
+
+def main(args=None):
+
+	args_config()
+	return 0
+
 
 
 if __name__ == '__main__':
-	sys.exit(main())
+	sys.exit(main(args=sys.argv))
 
 

@@ -1,0 +1,10 @@
+$salutation $name,
+
+I want something from you, let´s meet at $free_time_window in $location.
+
+please give me short notice if you have time...
+
+
+greetings
+
+My Name
