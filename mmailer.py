@@ -360,7 +360,7 @@ class Project (object):
 			if not smtp.connected:
 				smtp.connect_smtp()
 			for row in reader:
-				mail = Mail([], smtp)
+				mail = Mail(self.attachments, smtp)
 				msg_only = output.substitute(row)
 				mail.subject = unicode(output_subject.substitute(row), \
 					encoding='UTF-8')
