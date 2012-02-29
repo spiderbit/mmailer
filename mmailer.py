@@ -61,14 +61,9 @@ def ask(question, typ, default=None):
 	return value
 
 
-class Mail (object):
-
-	def __init__(self, files=[]):
+class SMTP(object):
+	def __init__(self):
 		self.cm = ConfigManager()
-		self.load_smtp()
-		self.files = files
-
-	def load_smtp(self):
 		config = self.cm.config
 		self.smtp_server = config.get('Mail', 'server')
 		self.port = config.get('Mail', 'port')
@@ -79,7 +74,7 @@ class Mail (object):
 		self.mail_from = config.get('Mail', 'email')
 		self.connected = False
 
-	def connect_smtp(self):
+	def connect(self):
 		try:
 			self.server = smtplib.SMTP(self.smtp_server, self.port)
 			if self.esmtp:
@@ -92,71 +87,8 @@ class Mail (object):
 		except:
 			self.connected = False
 
-	def quit(self):
-		if self.connected:
-			self.server.quit()
 
-
-
-	def send(self, sender, recipient, subject, body):
-		"""Send an email.
-
-		All arguments should be Unicode strings (plain ASCII works as well).
-
-		Only the real name part of sender and recipient addresses may contain
-		non-ASCII characters.
-
-		The email will be properly MIME encoded and delivered though SMTP to
-		localhost port 25.  This is easy to change if you want something different.
-
-		The charset of the email will be the first one out of US-ASCII, ISO-8859-1
-		and UTF-8 that can represent all the characters occurring in the email.
-		"""
-
-		# Header class is smart enough to try US-ASCII, then the charset we
-		# provide, then fall back to UTF-8.
-		header_charset = 'ISO-8859-1'
-
-		# We must choose the body charset manually
-		for body_charset in 'US-ASCII', 'ISO-8859-1', 'UTF-8':
-			try:
-				body.encode(body_charset)
-			except UnicodeError:
-				pass
-			else:
-				break
-
-		# Split real name (which is optional) and email address parts
-		sender_name, sender_addr = parseaddr(sender)
-		recipient_name, recipient_addr = parseaddr(recipient)
-
-		# We must always pass Unicode strings to Header, otherwise it will
-		# use RFC 2047 encoding even on plain ASCII strings.
-		sender_name = str(Header(unicode(sender_name), header_charset))
-		recipient_name = str(Header(unicode(recipient_name), header_charset))
-
-		# Make sure email addresses do not contain non-ASCII characters
-		sender_addr = sender_addr.encode('ascii')
-		recipient_addr = recipient_addr.encode('ascii')
-
-		# Create the message ('plain' stands for Content-Type: text/plain)
-		msg = MIMEMultipart()
-		body_msg = MIMEText(body.encode(body_charset), 'plain', body_charset)
-		msg['From'] = formataddr((sender_name, sender_addr))
-		msg['To'] = formataddr((recipient_name, recipient_addr))
-		msg['Subject'] = Header(unicode(subject), header_charset)
-		msg["Content-type"] = "text/html;charset=utf-8"
-		msg.attach(body_msg)
-		for f in self.files:
-			part = MIMEBase('application', "octet-stream")
-			part.set_payload( open(f,"rb").read() )
-			Encoders.encode_base64(part)
-			part.add_header('Content-Disposition', 'attachment; filename="%s"' % os.path.basename(f))
-			msg.attach(part)
-		# Send the message via SMTP
-		self.server.sendmail(sender, recipient, msg.as_string())
-
-	def ask_for_smtp(self):
+	def ask_settings(self):
 		# should be a mmailer config method
 		home = env['HOME']
 		config = self.cm.config
@@ -178,12 +110,95 @@ class Mail (object):
 			'string', config.get('Mail', 'user')))
 		self.cm.config.set('Mail', 'email', value)
 		print "try to connect!"
-		self.load_smtp()
-		self.connect_smtp()
+		self.connect()
 		if self.connected:
 			self.cm.write()
 		else:
 			print ("could not connect - restart and try again!")
+
+
+
+	def quit(self):
+		if self.connected:
+			self.server.quit()
+
+
+class Mail (object):
+
+	def __init__(self, files=[], smtp=None):
+		self.files = files
+		self.smtp = smtp
+		self.approved = False
+
+
+	def show(self):
+		print self.body
+		print "send to: %s" % self.recipient
+		print "subject: <%s>" % self.subject
+
+
+	def send(self):
+		"""Send an email.
+
+		All arguments should be Unicode strings (plain ASCII works as well).
+
+		Only the real name part of sender and recipient addresses may contain
+		non-ASCII characters.
+
+		The email will be properly MIME encoded and delivered though SMTP to
+		localhost port 25.  This is easy to change if you want something different.
+
+		The charset of the email will be the first one out of US-ASCII, ISO-8859-1
+		and UTF-8 that can represent all the characters occurring in the email.
+		"""
+
+		if not self.approved:
+			return False
+
+		# Header class is smart enough to try US-ASCII, then the charset we
+		# provide, then fall back to UTF-8.
+		header_charset = 'ISO-8859-1'
+
+		# We must choose the body charset manually
+		for body_charset in 'US-ASCII', 'ISO-8859-1', 'UTF-8':
+			try:
+				self.body.encode(body_charset)
+			except UnicodeError:
+				pass
+			else:
+				break
+
+		# Split real name (which is optional) and email address parts
+		sender_name, sender_addr = parseaddr(self.sender)
+		recipient_name, recipient_addr = parseaddr(self.recipient)
+
+		# We must always pass Unicode strings to Header, otherwise it will
+		# use RFC 2047 encoding even on plain ASCII strings.
+		sender_name = str(Header(unicode(sender_name), header_charset))
+		recipient_name = str(Header(unicode(recipient_name), header_charset))
+
+		# Make sure email addresses do not contain non-ASCII characters
+		sender_addr = sender_addr.encode('ascii')
+		recipient_addr = recipient_addr.encode('ascii')
+
+		# Create the message ('plain' stands for Content-Type: text/plain)
+		msg = MIMEMultipart()
+		body_msg = MIMEText(self.body.encode(body_charset), 'plain', body_charset)
+		msg['From'] = formataddr((sender_name, sender_addr))
+		msg['To'] = formataddr((recipient_name, recipient_addr))
+		msg['Subject'] = Header(unicode(self.subject), header_charset)
+		msg["Content-type"] = "text/html;charset=utf-8"
+		msg.attach(body_msg)
+		for f in self.files:
+			part = MIMEBase('application', "octet-stream")
+			part.set_payload( open(f,"rb").read() )
+			Encoders.encode_base64(part)
+			part.add_header('Content-Disposition', 'attachment; filename="%s"' % os.path.basename(f))
+			msg.attach(part)
+		# Send the message via SMTP
+		self.smtp.server.sendmail(self.sender, self.recipient, msg.as_string())
+		return True
+
 
 
 class ConfigManager (object):
@@ -251,6 +266,7 @@ class Project (object):
 			os.path.join(self.proj_dir, 'subject.txt')
 		self.keys = []
 		self.cm = ConfigManager()
+		self.mails = []
 
 	def create(self):
 		if not os.path.exists(self.proj_dir):
@@ -326,10 +342,9 @@ class Project (object):
 					dont exist or is no file: <%s>" % (row[:-1]))
 		return
 
-
 	def send(self):
-		mail = Mail()
-		mail.connect_smtp()
+		smtp = SMTP()
+		smtp.connect()
 		self.load_keys()
 		keys = self.keys
 		config = self.cm.config
@@ -342,27 +357,27 @@ class Project (object):
 			reader.next()
 			output_subject = Template(subject_template.readline()[:-1])
 			count = 0
+			if not smtp.connected:
+				smtp.connect_smtp()
 			for row in reader:
+				mail = Mail([], smtp)
 				msg_only = output.substitute(row)
-				subject = unicode(output_subject.substitute(row), \
+				mail.subject = unicode(output_subject.substitute(row), \
 					encoding='UTF-8')
 				mail_to = row['email']
-				print msg_only
-				print "send to: %s" % mail_to
-				print "subject: <%s>" % subject
-				approved = ask('Look over the mail is it all right?'\
+				mail.body = unicode(msg_only, encoding='UTF-8')
+				mail.recipient = unicode(mail_to, encoding='UTF-8')
+				mail.sender = unicode(config.get('Mail', 'email'), \
+					encoding='UTF-8')
+				mail.show()
+				mail.approved = ask('Look over the mail is it all right?'\
 					' should I send it for you?', 'bool', 'yes')
-				if approved:
-					if not mail.connected:
-						mail.connect_smtp()
-					body = unicode(msg_only, encoding='UTF-8')
-					recipient = unicode(mail_to, encoding='UTF-8')
-					sender = unicode(config.get('Mail', 'email'), \
-						encoding='UTF-8')
-					mail.send(sender, recipient, subject, body)
-					count+=1
-			print "did send %s mail[s]!" % (count)
-			mail.quit()
+				self.mails.append(mail)
+		for mail in self.mails:
+			if mail.send():
+				count+=1
+		print "did send %s mail[s]!" % (count)
+		smtp.quit()
 
 class ProjectList (object):
 
@@ -488,8 +503,8 @@ class MMailer (object):
 
 
 	def command_config(self, args):
-		mail = Mail()
-		mail.ask_for_smtp()
+		smtp = SMTP()
+		smtp.ask_settings()
 
 
 
