@@ -37,10 +37,9 @@ def ask(question, typ, default=None):
 			elif user_input == 'no':
 				value = False
 		elif typ == 'string':
-			if default == None:
+			if default == None or default == '':
 				user_input = raw_input('%s :' % (question))
-				if user_input != '':
-					value = user_input
+				value = user_input
 			else:
 				user_input = raw_input('%s [%s] :' % (question, default))
 				if user_input == '':
@@ -64,6 +63,9 @@ def ask(question, typ, default=None):
 class SMTP(object):
 	def __init__(self):
 		self.cm = ConfigManager()
+		self.load_config()
+
+	def load_config(self):
 		config = self.cm.config
 		self.smtp_server = config.get('Mail', 'server')
 		self.port = config.get('Mail', 'port')
@@ -79,10 +81,14 @@ class SMTP(object):
 			self.server = smtplib.SMTP(self.smtp_server, self.port)
 			if self.esmtp:
 				self.server.ehlo()
-				if self.tls: 
-					self.server.starttls()
-				self.server.ehlo()
-			self.server.login(self.user, self.password)
+			if self.tls:
+				self.server.starttls()
+			if self.user != '':
+				self.server.login(self.user, self.password)
+			mail_txt= "Test mail from the tool mmailer" \
+				" (https://github.com/spiderbit/mmailer) tool to see if the" \
+				" given smtp server works"
+			self.server.sendmail(self.mail_from, self.mail_from, mail_txt)
 			self.connected = True
 		except:
 			self.connected = False
@@ -109,13 +115,13 @@ class SMTP(object):
 		value = str(ask('Whats your email address',
 			'string', config.get('Mail', 'user')))
 		self.cm.config.set('Mail', 'email', value)
+		self.load_config()
 		print "try to connect!"
 		self.connect()
 		if self.connected:
 			self.cm.write()
 		else:
 			print ("could not connect - restart and try again!")
-
 
 
 	def quit(self):
