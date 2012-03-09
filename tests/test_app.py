@@ -284,12 +284,12 @@ class Test_MMailer(object):
 
 	def test_command_config_with_invalid_smtp(self):
 		config_changed = self.mm_config_fill()
-		#assert config_changed == False
 		citems = self.get_default_config_scheme()
 		config = SafeConfigParser()
 		config.read(self.config_path)
 		assert config.has_section('Mail')
-		assert config.items('Mail') == citems, config.items('Mail')
+		assert config.items('Mail') == citems, \
+			"\n[%s]\n[%s]" % (config.items('Mail'), citems)
 
 
 	def test_command_config_with_valid_smtp(self):
@@ -304,22 +304,28 @@ class Test_MMailer(object):
 		config = SafeConfigParser()
 		config.read(self.config_path)
 		assert config.has_section('Mail')
-		assert config.items('Mail') == citems, config.items('Mail')
+		assert config.items('Mail') == citems, \
+			"\n[%s]\n[%s]" % (config.items('Mail'), citems)
 
-# with the internal python smtp and a pop3-server I should test
-# the send command here:
-
-#	def test_command_send(self):
-#		files = ['mail.txt', 'subject.txt', 'keys.csv']
-#		proj_dir = self.mm_create_project('Test')
-#		self.create_with_sample_files(proj_dir, files)
-#		sample_path = os.path.abspath(os.path.join('.','tests', 'samples'))
-#		with open(os.path.join(proj_dir, 'attachments.txt'), 'w') as afile:
-#			attach1 = os.path.join(sample_path, 'attach_bin.gz')
-#			attach2 = os.path.join(sample_path, 'attach_ascii.txt')
-#			afile.write('%s\n%s\n' % (attach1, attach2))
-
-#		abs_file = os.path.join(proj_dir, 'keys.csv')
-#		self.mm_send()
-
-
+	def test_command_send(self):
+		# START SMTPD
+		tfile = tempfile.NamedTemporaryFile()
+		tfile_name = tfile.name
+		tfile.close()
+		p1 = Popen(['./tests/smtp_server.py', tfile_name], stdin=PIPE)
+		citems = self.get_testserver_config_scheme()
+		proj_dir = self.mm_create_project('Test')
+		config = SafeConfigParser()
+		config.read(self.config_path)
+		for item in citems:
+			config.set('Mail', item[0], item[1])
+		files = ['mail.txt', 'subject.txt', 'keys.csv', 'attachments.txt']
+		self.create_with_sample_files(proj_dir, files)
+		config.write(open(self.config_path, 'w'))
+		sys.stdin = x_in = StringIO('\n')
+		sys.stdout = x_out = StringIO()
+		self.mm_send()
+		p1.terminate()
+		p1.wait()
+		import filecmp
+		assert filecmp.cmp(tfile_name, 'tests/samples/sended.txt')

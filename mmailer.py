@@ -85,10 +85,6 @@ class SMTP(object):
 				self.server.starttls()
 			if self.user != '':
 				self.server.login(self.user, self.password)
-			mail_txt= "Test mail from the tool mmailer" \
-				" (https://github.com/spiderbit/mmailer) tool to see if the" \
-				" given smtp server works"
-			self.server.sendmail(self.mail_from, self.mail_from, mail_txt)
 			self.connected = True
 		except:
 			self.connected = False
@@ -118,7 +114,15 @@ class SMTP(object):
 		self.load_config()
 		print "try to connect!"
 		self.connect()
-		if self.connected:
+		mail_txt= "Test mail from the tool mmailer" \
+			" (https://github.com/spiderbit/mmailer) tool to see if the" \
+			" given smtp server works"
+		tested = True
+		try:
+			self.server.sendmail(self.mail_from, self.mail_from, mail_txt)
+		except:
+			tested = False
+		if tested:
 			self.cm.write()
 		else:
 			print ("could not connect - restart and try again!")
@@ -138,7 +142,17 @@ class Mail (object):
 
 
 	def show(self):
-		print self.body
+		# We must choose the body charset manually
+		for body_charset in 'US-ASCII', 'ISO-8859-1', 'UTF-8':
+			try:
+				self.body.encode(body_charset)
+			except UnicodeError:
+				pass
+			else:
+				break
+		body_msg = MIMEText(self.body.encode(body_charset), \
+			'plain', body_charset)
+		print body_msg
 		print "send to: %s" % self.recipient
 		print "subject: <%s>" % self.subject
 
@@ -199,9 +213,11 @@ class Mail (object):
 			part = MIMEBase('application', "octet-stream")
 			part.set_payload( open(f,"rb").read() )
 			Encoders.encode_base64(part)
-			part.add_header('Content-Disposition', 'attachment; filename="%s"' % os.path.basename(f))
+			part.add_header('Content-Disposition', \
+				'attachment; filename="%s"' % os.path.basename(f))
 			msg.attach(part)
 		# Send the message via SMTP
+		self.smtp.connect()
 		self.smtp.server.sendmail(self.sender, self.recipient, msg.as_string())
 		return True
 
@@ -349,12 +365,11 @@ class Project (object):
 		return
 
 	def send(self):
-		smtp = SMTP()
-		smtp.connect()
 		self.load_keys()
 		keys = self.keys
 		config = self.cm.config
 		self.load_attachments()
+		smtp = SMTP()
 		with open(self.substitude_file(), 'rb') as csv_file, \
 		open(self.template_files['mail'], 'rb') as mail_template,\
 		open(self.template_files['subject'], 'rb') as subject_template:
@@ -363,8 +378,7 @@ class Project (object):
 			reader.next()
 			output_subject = Template(subject_template.readline()[:-1])
 			count = 0
-			if not smtp.connected:
-				smtp.connect_smtp()
+
 			for row in reader:
 				mail = Mail(self.attachments, smtp)
 				msg_only = output.substitute(row)
@@ -379,6 +393,8 @@ class Project (object):
 				mail.approved = ask('Look over the mail is it all right?'\
 					' should I send it for you?', 'bool', 'yes')
 				self.mails.append(mail)
+
+		smtp.connect()
 		for mail in self.mails:
 			if mail.send():
 				count+=1
@@ -561,5 +577,3 @@ def main(args=None):
 
 if __name__ == '__main__':
 	sys.exit(main(args=sys.argv))
-
-

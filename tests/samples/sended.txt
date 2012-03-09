@@ -1,0 +1,4 @@
+Receiving message from: 127.0.0.1
+Message addressed from: x@localhost
+Message addressed to  : ['noname@nohost.no']
+Message length        : 1080
