@@ -10,7 +10,7 @@ import getpass
 import socket
 import sys
 import mmailer
-from mmailer import MMailer
+from mmail.mmailer import MMailer
 import subprocess
 from subprocess import PIPE, Popen, call
 from StringIO import StringIO
@@ -98,12 +98,11 @@ class Test_MMailer(object):
 
 	def test_start_no_arg_right_output(self):
 		error_screen = []
-		error_screen.append("usage: mmailer.py [-h]")
-		error_screen.append( "                  " \
+		error_screen.append("usage: mmailer [-h] " \
 			+"{new,list,select,edit,edit-table,remove,config,send} ...")
-		error_screen.append("mmailer.py: error: too few arguments")
+		error_screen.append("mmailer: error: too few arguments")
 		try:
-			output = subprocess.check_output('./mmailer.py',
+			output = subprocess.check_output('./mmailer',
 				stderr=subprocess.STDOUT)
 		except subprocess.CalledProcessError as cp:
 			output = cp.output.splitlines()
@@ -117,10 +116,10 @@ class Test_MMailer(object):
 		assert output == output_target
 
 	def mm_list(self):
-		return subprocess.check_output(['./mmailer.py', 'list'])
+		return subprocess.check_output(['./mmailer', 'list'])
 
 	def mm_remove(self):
-		p = subprocess.Popen(['./mmailer.py', 'remove'],\
+		p = subprocess.Popen(['./mmailer', 'remove'],\
 			stdin=PIPE, stdout=PIPE)
 		question = p.communicate('yes')[0]
 		assert question == 'Are you shure? [yes/NO] :', question
@@ -133,11 +132,11 @@ class Test_MMailer(object):
 
 
 	def mm_select(self, project):
-		p = subprocess.call(['./mmailer.py', 'select', project])
+		p = subprocess.call(['./mmailer', 'select', project])
 
 
 	def mm_send(self):
-		p = subprocess.Popen(['./mmailer.py', 'send'],\
+		p = subprocess.Popen(['./mmailer', 'send'],\
 			stdin=PIPE, stdout=PIPE)
 		question = p.communicate('yes')[0]
 		try:
@@ -148,7 +147,7 @@ class Test_MMailer(object):
 		return
 
 	def mm_create_project(self, name):
-		subprocess.call(['./mmailer.py', 'new', name])
+		subprocess.call(['./mmailer', 'new', name])
 		return os.path.join(self.projects_dir, name)
 
 	def test_command_list_filled(self):

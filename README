@@ -1,25 +1,47 @@
-# mmailer
+=======
+mmailer
+=======
 
 mmailer is Mass-mailer tool, it allows you to send generated mails from a mail-template and substitudes from a csv file.
 
 mmailer currently is tested and runs shure under Linux and python 2.7
 
 
-# License
+License
+=======
 
 mmailer is free software and licensed under the GNU GPLv3 or later. You
 are welcome to change and redistribute it under certain conditions. For more
 information see the LICENSE file or visit http://www.gnu.org/licenses/gpl-3.0.html
 
 
-# Requirements
+Requirements
+============
 
    - python > 2.7
    - mail-server
 
+Installation
+============
+
+Over PyPi
+---------
+
+	> pip install mmailer
+
+
+Installing from source
+----------------------
+
+	$ python setup.py install # may need to be root
+
+
+Usage
+=====
+
 Start mmailer with --help to find out how to use it!
 
-   $ sh mmailer.py --help
+   $ mmailer --help
 
 * be aware that mmailer saves your password in cleartext right now in the config file.
 
@@ -31,5 +53,3 @@ For each mail you want to send, fill out one line of substitude in the csv file.
 
 
 Have fun!
-
-

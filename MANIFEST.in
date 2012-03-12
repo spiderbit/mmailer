@@ -1,0 +1,6 @@
+include mmail/mmailer.py
+include LICENSE
+include mmail/__init__.py
+include README
+include versioneer.py
+include mmailer
