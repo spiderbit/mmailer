@@ -528,7 +528,12 @@ class MMailer (object):
 		smtp = SMTP()
 		smtp.ask_settings()
 
-
+	def command_version(self, args):
+		import versioneer
+		versioneer.tag_prefix = ''
+		versioneer.parentdir_prefix = ''
+		versioneer.versionfile_source = 'mmail/_version.py'
+		print versioneer.get_version()
 
 def args_config():
 	m = MMailer()
@@ -540,6 +545,8 @@ def args_config():
 	new_parser.set_defaults(func=m.command_new)
 	list_parser = subparsers.add_parser('list')
 	list_parser.set_defaults(func=m.command_list)
+	version_parser = subparsers.add_parser('version')
+	version_parser.set_defaults(func=m.command_version)
 	select_parser = subparsers.add_parser('select')
 	select_parser.add_argument('proj_name')
 	select_parser.set_defaults(func=m.command_select)
@@ -554,6 +561,7 @@ def args_config():
 	send_parser = subparsers.add_parser('send')
 	send_parser.set_defaults(func=m.command_send)
 	new_parser.description = "creates a new project"
+	version_parser.description = "prints out the version of mmailer"
 	list_parser.description = "lists all projects"
 	select_parser.description = "selects a project"
 	edit_parser.description = "edits the project files"

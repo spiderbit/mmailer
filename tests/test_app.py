@@ -98,8 +98,10 @@ class Test_MMailer(object):
 
 	def test_start_no_arg_right_output(self):
 		error_screen = []
-		error_screen.append("usage: mmailer [-h] " \
-			+"{new,list,select,edit,edit-table,remove,config,send} ...")
+		error_screen.append("usage: mmailer [-h]")
+		error_screen.append("               " \
+			+ "{new,list,version,select,edit,edit-table,remove,config,send}")
+		error_screen.append("               ...")
 		error_screen.append("mmailer: error: too few arguments")
 		try:
 			output = subprocess.check_output('./mmailer',
