@@ -223,16 +223,16 @@ class Test_MMailer(object):
 		assert self.last_call == ['gedit', abs_files[0], \
 			abs_files[1], abs_files[2]], self.last_call
 
-	def create_with_sample_files(self, proj_dir, files=None):
+	def create_with_sample_files(self, sample_dir, proj_dir, files=None):
 		if files == None:
 			files = ['mail.txt', 'subject.txt']
 		for f in files:
-			shutil.copy(os.path.join('tests','samples', f), proj_dir)
+			shutil.copy(os.path.join('tests','samples', sample_dir, f), proj_dir)
 
 
 	def test_command_edit_table(self):
 		proj_dir = self.mm_create_project('Test')
-		self.create_with_sample_files(proj_dir)
+		self.create_with_sample_files("", proj_dir)
 		env['EDITOR'] = 'gedit'
 		sys.argv = ['mmailer', 'edit-table']
 		subprocess_call_save = subprocess.call
@@ -321,12 +321,22 @@ class Test_MMailer(object):
 		for item in citems:
 			config.set('Mail', item[0], item[1])
 		files = ['mail.txt', 'subject.txt', 'keys.csv', 'attachments.txt']
-		self.create_with_sample_files(proj_dir, files)
+		self.create_with_sample_files("", proj_dir, files)
 		config.write(open(self.config_path, 'w'))
 		sys.stdin = x_in = StringIO('\n')
 		sys.stdout = x_out = StringIO()
-		self.mm_send()
+		m = MMailer()
+		m.command_send(args=['mmailer', 'send'])
+		sys.stdin = sys.__stdin__
+		sys.stdout = sys.__stdout__
 		p1.terminate()
 		p1.wait()
+		of = open('tests/samples/send_output.txt','r')
+		sto_str = of.read()
+		sto = sto_str.decode('UTF-8')
+		# exclude first line from compare,
+		# because the date changes each test run
+		assert x_out.getvalue() == sto,"\n\n[%s]\n\n[%s]" \
+				% (sto, x_out.getvalue())
 		import filecmp
 		assert filecmp.cmp(tfile_name, 'tests/samples/sended.txt')

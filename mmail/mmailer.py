@@ -152,7 +152,7 @@ class Mail (object):
 				break
 		body_msg = MIMEText(self.body.encode(body_charset), \
 			'plain', body_charset)
-		print body_msg
+		print self.body
 		print "send to: %s" % self.recipient
 		print "subject: <%s>" % self.subject
 
