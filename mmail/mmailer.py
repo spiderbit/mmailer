@@ -529,11 +529,8 @@ class MMailer (object):
 		smtp.ask_settings()
 
 	def command_version(self, args):
-		import versioneer
-		versioneer.tag_prefix = ''
-		versioneer.parentdir_prefix = ''
-		versioneer.versionfile_source = 'mmail/_version.py'
-		print versioneer.get_version()
+		from _version import get_versions
+		print get_versions()['version']
 
 def args_config():
 	m = MMailer()

@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 
 import versioneer
@@ -21,5 +22,6 @@ setup(name='mmailer',
 			license='LICENSE',
 			long_description=open('README').read(),
 			packages = ['mmail'],
+			py_modules = ['versioneer'],
 			scripts=['mmailer']
 			)
