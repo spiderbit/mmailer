@@ -4,3 +4,7 @@ include mmail/__init__.py
 include README
 include versioneer.py
 include mmailer
+include tests/*.py
+include tests/samples/*.txt
+include tests/samples/*.csv
+include tests/samples/*.gz
